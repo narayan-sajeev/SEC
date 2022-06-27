@@ -1,8 +1,15 @@
+# import sec downloader
 from sec_edgar_downloader import Downloader
+# import os module to clear screen
 import os
+# import shutil to move files
 import shutil
+# import beautiful soup to parse html
 from bs4 import BeautifulSoup
+# import string module to retrieve digits
 import string
+# import most common words
+from nltk.corpus import stopwords
 
 # create downloader object
 download = Downloader()
@@ -12,6 +19,9 @@ companies = ["AAPL", "MSFT", "TWTR"]
 
 # define list of text to parse
 parse_text = []
+
+# define list to store word counts
+count_lst = []
 
 # clear screen
 def clear_screen():
@@ -44,7 +54,6 @@ def download_files():
     for comp in companies:
         # download company file
         download.get("10-K", comp, amount=1)
-        pass
 
 # move files from nested directories to unified directory
 def move_files():
@@ -130,6 +139,10 @@ def clean_files():
 
 # remove substrings from text
 def remove_substrings(text, substrings):
+
+    # add punctuation to substrings
+    substrings += string.punctuation
+
     # loop through substrings
     for s in substrings:
         # remove substring
@@ -139,7 +152,10 @@ def remove_substrings(text, substrings):
     return text
 
 # remove whitespace from text
-def remove_whitespace(text, whitespaces):
+def remove_whitespace(text):
+
+    # define whitespaces
+    whitespaces = string.whitespace
 
     # remove whitespace
     text = text.strip()
@@ -152,6 +168,18 @@ def remove_whitespace(text, whitespaces):
     # return text
     return text
 
+# check if word includes digit
+def includes(word, digits):
+    # loop through characters
+    for c in word:
+        # if character is digit
+        if c in digits:
+            # return true
+            return True
+
+    # if there are no digits in word, return false
+    return False
+
 # remove numbers from text
 def remove_num(text):
 
@@ -159,18 +187,30 @@ def remove_num(text):
     digits = list(string.digits)
 
     # define new text
-    new_text = text.split()
+    new_text = []
 
     # loop through words
-    for w in new_text:
-        # loop through characters
-        for c in w:
-            # if character is a digit
-            if c in digits:
-                # remove word
-                new_text.remove(w)
-                # break out of loop
-                break
+    for w in text.split():
+        # if word does not include a digit
+        if not includes(w, digits):
+            # add word
+            new_text.append(w)
+
+    # return new text
+    return " ".join(new_text)
+
+# remove most common words
+def remove_stop_words(text):
+
+    # define new text
+    new_text = []
+
+    # loop through words
+    for w in text.split():
+        # if word is not common
+        if w not in stopwords.words("english"):
+            # add word
+            new_text.append(w)
 
     # return new text
     return " ".join(new_text)
@@ -203,17 +243,72 @@ def open_files():
             # use beautiful soup
             soup = BeautifulSoup(final, "html.parser")
 
-            # remove punctuation and symbols from text
-            formatted = remove_substrings(soup.text, ["\n", " | 2021 form 10-k | ", ".", ",", "’", ";"])
+            # remove symbols from text
+            formatted = remove_substrings(soup.text, ["\n", " | 2021 form 10-k | ", "•", "’", "”", "“", ";"])
 
             # remove whitespace
-            formatted = remove_whitespace(formatted, ["       ", "   "])
+            formatted = remove_whitespace(formatted)
 
             # remove numbers
             formatted = remove_num(formatted)
 
+            # remove most common words
+            formatted = remove_stop_words(formatted)
+
             # add text to list
             parse_text.append(formatted)
+
+# find word counts
+def word_count():
+
+    # loop through text
+    for text in parse_text:
+        # define counter
+        counter = {}
+        # loop through words
+        for word in text.split():
+            # increment word count
+            counter[word] = counter.get(word, 0) + 1
+
+        # retrieve keys
+        keys = list(counter.keys())
+
+        # sort keys
+        keys.sort()
+
+        # loop through words
+        for i, word in enumerate(keys):
+            # if it is not last word
+            if i + 1 < len(keys):
+                # retrieve next word
+                next_word = keys[i + 1]
+                # check if next word contains this word and if next word is not much larger (not another word entirely)
+                if word in next_word and len(next_word) - len(word) < 3:
+                    # update word count of next word
+                    counter[next_word] = counter.get(next_word, 0) + counter.get(word, 0)
+                    # remove current word
+                    counter.pop(word)
+
+        # define current list
+        curr_lst = []
+
+        # loop through counts
+        for word, freq in counter.items():
+            # add count to list
+            curr_lst.append([freq, word])
+
+        # sort list in descending order
+        curr_lst.sort(reverse=True)
+
+        # add current list to list of lists
+        count_lst.append(curr_lst)
+
+    # loop through list of lists
+    for lst in count_lst:
+        # loop through list
+        for freq, word in lst:
+            # print word and frequency
+            print("%s: %s\n\n\n" % (word, freq))
 
 clear_screen()
 # create_dir()
@@ -221,3 +316,4 @@ clear_screen()
 # move_files()
 # clean_files()
 open_files()
+word_count()
