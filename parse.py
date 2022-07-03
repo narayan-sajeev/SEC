@@ -12,7 +12,7 @@ import string
 from nltk.corpus import stopwords
 # import urllib to open links
 from urllib.request import urlopen
-# import math for square root
+# import math for square root and log
 import math
 
 # create downloader object
@@ -30,8 +30,8 @@ count_lst = []
 # define glossary
 glossary = []
 
-# create list for frequencies of words
-freqs = []
+# create dictionary for frequencies of words
+freqs = {}
 
 # clear screen
 def clear_screen():
@@ -295,25 +295,66 @@ def word_freq():
             pct_freq = freq/total_num * 100
             # weight frequency
             freq = weight(pct_freq)
-            # add word & frequency to list
-            freqs.append([freq, word])
+            # add word & frequency to dictionary
+            freqs[word] = freq
 
-    # sort list in descending order
-    freqs.sort(reverse=True)
+# retrieve highest weighted frequency
+def max_freq():
 
-    for _ in freqs:
-        f = _[0]
-        w = _[1]
-        print("%s: %s" % (w, f))
+    # define max frequency
+    max = -1
+
+    # loop through dictionary
+    for w, f in freqs.items():
+        # if current frequency is greater
+        if f > max:
+            # update max
+            max = f
+
+    # return max
+    return max
 
 # calculate score
-def calc_score(term, text):
-    # count number of words
-    term_words = len(term.split())
-    # count frequency
-    freq = text.count(format_term)
-    # return calculated score
-    return term_words * freq
+def calc_score(term):
+
+    # if term is common
+    if term in freqs.keys():
+        # return weighted frequency
+        return freqs[term]
+
+    # split by words
+    lst = term.split()
+
+    # if term is 1 word and rare
+    if len(lst) < 2:
+        # return max frequency
+        return max_freq()
+
+    # set score to 0
+    score = 0
+
+    # loop through words
+    for w in lst:
+        # if word is common
+        if w in freqs.keys():
+            # increment by weighted frequency
+            score += freqs[w]
+        # if word is rare
+        else:
+            # increment by max frequency
+            score += max_freq()
+
+    # return score
+    return score
+
+# adjust score depending on text length
+def adjust_score(score, text):
+    # retrieve number of words
+    num = len(text.split())
+    # divide score by length
+    score /= math.log(num)
+    # return new score
+    return score
 
 # count cyber word frequency
 def count_cyber_freq():
@@ -327,17 +368,16 @@ def count_cyber_freq():
             # if term is present
             if format_term in text:
                 # increase score
-                score += calc_score(term, text)
+                score += calc_score(term)
 
-        # count number of words
-        num_words = len(text.split())
-        # calculate percentage
-        pct = score/num_words * 100
+        # adjust score depending on text length
+        score = adjust_score(score, text)
+
         # print percent
-        print("%s %s %s\n\n" % (score, num_words, pct))
+        print("%s\n\n" % score)
 
 clear_screen()
-# parse_files()
+parse_files()
 get_cyber_words()
-# count_cyber_freq()
 word_freq()
+count_cyber_freq()
