@@ -10,6 +10,10 @@ from bs4 import BeautifulSoup
 import string
 # import most common words
 from nltk.corpus import stopwords
+# import urllib to open links
+from urllib.request import urlopen
+# import math for square root
+import math
 
 # create downloader object
 download = Downloader()
@@ -23,119 +27,18 @@ parse_text = []
 # define list to store word counts
 count_lst = []
 
+# define glossary
+glossary = []
+
+# create list for frequencies of words
+freqs = []
+
 # clear screen
 def clear_screen():
     # repeat 4 times
     for i in range(4):
         # clear screen
         os.system("clear")
-
-# create directory (folder) to store files
-def create_dir():
-
-    # set parent directory of new folder to current directory
-    parent_dir = os.getcwd()
-
-    # define new directory name
-    path = os.path.join(parent_dir, "Files")
-
-    # try
-    try:
-        # create directory
-        os.mkdir(path)
-    # if directory already exists:
-    except:
-        # do nothing
-        pass
-
-# download 10-K files
-def download_files():
-    # loop through companies
-    for comp in companies:
-        # download company file
-        download.get("10-K", comp, amount=1)
-
-# move files from nested directories to unified directory
-def move_files():
-    # loop through company folder
-    for comp in os.listdir("sec-edgar-filings"):
-
-        # if directory starts with "."
-        if comp.startswith("."):
-            # invalid, go to next directory
-            continue
-        # define company directory name
-        comp_dir = os.path.join("sec-edgar-filings", comp)
-        # define file directory name
-        f_dir = os.path.join(comp_dir, "10-K")
-
-        # loop through directories
-        for dir in os.listdir(f_dir):
-
-            # if directory starts with "."
-            if dir.startswith("."):
-                # invalid, go to next directory
-                continue
-
-            # define current directory
-            curr_dir = os.path.join(f_dir, dir)
-            # define current path
-            curr_path = os.path.join(curr_dir, "filing-details.html")
-
-            # define new filename
-            new_fname = comp + ".html"
-            # define new path
-            new_path = os.path.join("Files", new_fname)
-
-            # move file from old directory to new directory
-            shutil.move(curr_path, new_path)
-
-# clean code in files
-def clean_files():
-    # for filename in directory
-    for fname in os.listdir("Files"):
-
-        # if filename starts with "."
-        if fname.startswith("."):
-            # invalid, go to next file
-            continue
-
-        # define path
-        path = os.path.join("Files", fname)
-
-        # create string to hold cleaned file text
-        cleaned_file = ""
-
-        # open file to read
-        with open(path, "r") as file:
-            # read file
-            text = file.read()
-            # reduce newlines
-            text = text.strip()
-
-            # define formatted string
-            formatted = ""
-
-            # loop through characters
-            for c in text:
-                # if character is non-breaking space
-                if ord(c) == 160:
-                    # replace with standard space
-                    formatted += " "
-                # otherwise
-                else:
-                    # add character to string
-                    formatted += c
-
-            # use beautiful soup
-            soup = BeautifulSoup(formatted, "html.parser")
-            # clean code
-            cleaned_file = soup.prettify()
-
-        # open file to write
-        with open(path, "w") as old_file:
-            # replace file with cleaned file
-            old_file.write(cleaned_file)
 
 # remove substrings from text
 def remove_substrings(text, substrings):
@@ -169,7 +72,7 @@ def remove_whitespace(text):
     return text
 
 # check if word includes digit
-def includes(word, digits):
+def includes_digit(word, digits):
     # loop through characters
     for c in word:
         # if character is digit
@@ -192,7 +95,7 @@ def remove_num(text):
     # loop through words
     for w in text.split():
         # if word does not include a digit
-        if not includes(w, digits):
+        if not includes_digit(w, digits):
             # add word
             new_text.append(w)
 
@@ -215,8 +118,8 @@ def remove_stop_words(text):
     # return new text
     return " ".join(new_text)
 
-# open files
-def open_files():
+# parse files
+def parse_files():
     # for filename in directory
     for fname in os.listdir("Files"):
 
@@ -258,62 +161,183 @@ def open_files():
             # add text to list
             parse_text.append(formatted)
 
-# find word counts
-def word_count():
+# format glossary word
+def format_glossary(text):
 
-    # loop through text
+    # make text lwoercase
+    text = text.lower()
+
+    # define characters to remove
+    lst = ["                         ", "                          ", "\n"]
+
+    # loop through characters
+    for c in lst:
+        # remove character
+        text = "".join(text.split(c))
+        # remove whitespace
+        text = text.strip()
+
+    return text
+
+# retrieve possible words from word with parentheses
+def return_possible_words(word):
+    # define dictionary of characters and what to replace with
+    chars = {"( r)": "r", "(s)": "s"}
+
+    # define list of words to return
+    return_lst = []
+
+    # loop through characters
+    for orig, new in chars.items():
+
+        # if word contains character
+        if orig in word:
+            # retrieve first word
+            first = "".join(word.split(orig))
+            # retrieve second word
+            second = new.join(word.split(orig))
+            # add first word to lst
+            return_lst.append(first)
+            # add second word to lst
+            return_lst.append(second)
+
+    # return lst
+    return return_lst
+
+# retrieve cybersecurity glossary
+def get_cyber_words():
+    # define variable to store data
+    data = ""
+    # open glossary to read
+    with open("glossary.html", "r") as file:
+        # retrieve data
+        data = file.read()
+
+        # use BeautifulSoup
+    soup = BeautifulSoup(data, "html.parser")
+
+    # retrieve words
+    tags = soup.find_all("dt")
+
+    # loop through tags
+    for tag in tags:
+
+        # format glossary word
+        formatted = format_glossary(tag.text)
+
+        # if word isn't already there
+        if formatted not in glossary:
+
+            # if there is a slash
+            if " / " in formatted:
+                # loop through each word
+                for w in formatted.split(" / "):
+                    # add word to glossary
+                    glossary.append(w)
+            # if there is (r) or (s)
+            elif "( r)" in formatted or "(s)" in formatted:
+                # retrieve first possible word
+                first = return_possible_words(formatted)[0]
+                # retrieve second possible word
+                second = return_possible_words(formatted)[1]
+                # add first word to glossary
+                glossary.append(first)
+                # add second word to glossary
+                glossary.append(second)
+            # if there is an acronym
+            elif " (" in formatted:
+                # retrieve first word
+                first = formatted.split(" (")[0]
+                # retrieve second word
+                second = formatted.split(" (")[1]
+                # remove parentheses
+                second = second.split(")")[0]
+                # add first word to glossary
+                glossary.append(first)
+                # add second word to glossary
+                glossary.append(second)
+            # otherwise
+            else:
+                # add formatted word to glossary
+                glossary.append(formatted)
+
+    # sort glossary
+    glossary.sort()
+
+# weight rare words heavier than common words
+def weight(freq):
+    # increase weight for rare words
+    return math.sqrt(1/freq)
+
+# calculate word frequencies
+def word_freq():
+    # set total number of words to 1 trillion
+    total_num = 10 ** 12
+    # open words file
+    with open("all_words.csv", "r") as file:
+
+        # loop through lines
+        for l in file:
+
+            # retrieve word
+            word = l.split(",")[0]
+
+            # if word is not cyber-related
+            if word not in glossary:
+                # skip it
+                continue
+
+            # retrieve frequency
+            freq = l.split(",")[1]
+            # convert frequency to integer
+            freq = int(freq)
+            # calculate percent frequency
+            pct_freq = freq/total_num * 100
+            # weight frequency
+            freq = weight(pct_freq)
+            # add word & frequency to list
+            freqs.append([freq, word])
+
+    # sort list in descending order
+    freqs.sort(reverse=True)
+
+    for _ in freqs:
+        f = _[0]
+        w = _[1]
+        print("%s: %s" % (w, f))
+
+# calculate score
+def calc_score(term, text):
+    # count number of words
+    term_words = len(term.split())
+    # count frequency
+    freq = text.count(format_term)
+    # return calculated score
+    return term_words * freq
+
+# count cyber word frequency
+def count_cyber_freq():
+    # loop through text list
     for text in parse_text:
-        # define counter
-        counter = {}
-        # loop through words
-        for word in text.split():
-            # increment word count
-            counter[word] = counter.get(word, 0) + 1
+        # create cyber score
+        score = 0
+        # loop through glossary
+        for term in glossary:
+            format_term = " %s " % term
+            # if term is present
+            if format_term in text:
+                # increase score
+                score += calc_score(term, text)
 
-        # retrieve keys
-        keys = list(counter.keys())
-
-        # sort keys
-        keys.sort()
-
-        # loop through words
-        for i, word in enumerate(keys):
-            # if it is not last word
-            if i + 1 < len(keys):
-                # retrieve next word
-                next_word = keys[i + 1]
-                # check if next word contains this word and if next word is not much larger (not another word entirely)
-                if word in next_word and len(next_word) - len(word) < 3:
-                    # update word count of next word
-                    counter[next_word] = counter.get(next_word, 0) + counter.get(word, 0)
-                    # remove current word
-                    counter.pop(word)
-
-        # define current list
-        curr_lst = []
-
-        # loop through counts
-        for word, freq in counter.items():
-            # add count to list
-            curr_lst.append([freq, word])
-
-        # sort list in descending order
-        curr_lst.sort(reverse=True)
-
-        # add current list to list of lists
-        count_lst.append(curr_lst)
-
-    # loop through list of lists
-    for lst in count_lst:
-        # loop through list
-        for freq, word in lst:
-            # print word and frequency
-            print("%s: %s\n\n\n" % (word, freq))
+        # count number of words
+        num_words = len(text.split())
+        # calculate percentage
+        pct = score/num_words * 100
+        # print percent
+        print("%s %s %s\n\n" % (score, num_words, pct))
 
 clear_screen()
-# create_dir()
-# download_files()
-# move_files()
-# clean_files()
-open_files()
-word_count()
+# parse_files()
+get_cyber_words()
+# count_cyber_freq()
+word_freq()
