@@ -1,9 +1,5 @@
-# import sec downloader
-from sec_edgar_downloader import Downloader
 # import os module to clear screen
 import os
-# import shutil to move files
-import shutil
 # import beautiful soup to parse html
 from bs4 import BeautifulSoup
 # import string module to retrieve digits
@@ -15,30 +11,14 @@ from urllib.request import urlopen
 # import math for square root and log
 import math
 
-# create downloader object
-download = Downloader()
-
-# define companies to download
-companies = ["AAPL", "MSFT", "TWTR"]
-
-# define list of text to parse
-parse_text = []
-
-# define list to store word counts
-count_lst = []
+# define dictionary of text to parse
+parse_text = {}
 
 # define glossary
 glossary = []
 
 # create dictionary for frequencies of words
 freqs = {}
-
-# clear screen
-def clear_screen():
-    # repeat 4 times
-    for i in range(4):
-        # clear screen
-        os.system("clear")
 
 # remove substrings from text
 def remove_substrings(text, substrings):
@@ -158,8 +138,11 @@ def parse_files():
             # remove most common words
             formatted = remove_stop_words(formatted)
 
-            # add text to list
-            parse_text.append(formatted)
+            # retrieve company name
+            company = fname.split(".")[0]
+
+            # add company and text to dictionary
+            parse_text[company] = formatted
 
 # format glossary word
 def format_glossary(text):
@@ -358,8 +341,8 @@ def adjust_score(score, text):
 
 # count cyber word frequency
 def count_cyber_freq():
-    # loop through text list
-    for text in parse_text:
+    # loop through dictionary
+    for comp, text in parse_text.items():
         # create cyber score
         score = 0
         # loop through glossary
@@ -373,10 +356,14 @@ def count_cyber_freq():
         # adjust score depending on text length
         score = adjust_score(score, text)
 
-        # print percent
-        print("%s\n\n" % score)
+        # round score
+        score = round(score)
 
-clear_screen()
+        # print company and percent
+        print("%s: %s\n\n" % (comp, score))
+
+# clear screen
+os.system("clear")
 parse_files()
 get_cyber_words()
 word_freq()
